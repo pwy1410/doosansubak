@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>동호수 배치도</title>
+  <meta name="description" content="아파트 단지 동·호수 배치도 (반응형, 인쇄 지원)" />
+  <style>
+    :root{
+      --bg:#ffffff;--panel:#f9f9f9;--line:#cccccc;--text:#222222;--muted:#666666;--accent:#6699ff;--hl:#26d4c3;
+      --typeA:#a6c8ff; --typeB:#a8f0c6; --typeC:#ffe7a8; --typeD:#ffb3b3; --type74:#d2b7ff;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Apple SD Gothic Neo,Noto Sans KR,Malgun Gothic,Arial,sans-serif;color:var(--text);background:var(--bg)}
+    .container{width:min(1200px,94%);margin:0 auto;padding:20px}
+    header{position:sticky;top:0;z-index:5;background:#fffcccee;backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+    .nav{display:flex;align-items:center;justify-content:space-between;padding:14px 0}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:800}
+    .brand .dot{width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--hl));box-shadow:0 0 8px #26d4c355}
+
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 4px 16px #0001}
+    .controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
+    .controls .field{display:flex;flex-direction:column;gap:6px}
+    .controls label{color:var(--muted);font-size:.9rem}
+    select,input{appearance:none;background:#fff;color:var(--text);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-width:140px}
+    .btn{background:linear-gradient(135deg,var(--accent),var(--hl));color:#fff;border:none;border-radius:999px;padding:10px 14px;font-weight:800;cursor:pointer}
+
+    .grid-wrap{margin-top:16px}
+    .stack-labels{display:grid;grid-auto-flow:column;gap:0;background:#eee;position:sticky;top:0;z-index:2}
+    .stack-label{border-left:1px solid var(--line);padding:8px 10px;text-align:center;color:var(--muted);font-weight:700;white-space:nowrap}
+
+    .grid{display:grid;border:1px solid var(--line);border-radius:16px;overflow:auto}
+    .row{display:grid}
+    .floor-label{background:#f0f0f0;color:#000;padding:8px 10px;border-top:1px solid var(--line);position:sticky;left:0;z-index:1;white-space:nowrap}
+    .cell{border-top:1px solid var(--line);border-left:1px solid var(--line);padding:0;text-align:center}
+    .cell a{display:block;width:100%;height:100%;padding:8px 10px;text-decoration:none;color:#000;font-weight:600}
+    .cell a:focus{outline:none}
+    .cell:hover{opacity:0.9}
+    .cell.selected{outline:3px solid var(--hl);outline-offset:-3px}
+
+    .legend{display:flex;gap:10px;flex-wrap:wrap;color:var(--muted);font-size:.9rem;margin-top:12px}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);padding:6px 10px;border-radius:999px;background:#fff}
+    .dot{width:12px;height:12px;border-radius:50%}
+
+    .dong-block{margin-top:24px}
+    .dong-title{display:flex;flex-direction:column;margin:6px 0 8px}
+    .dong-title h3{margin:0;font-size:1.2rem}
+    .dong-title .range{color:var(--muted);font-size:.9rem;margin-top:4px}
+    .dong-title .types{color:var(--text);font-size:.95rem;margin-top:4px;line-height:1.4}
+    .dong-inner{margin-top:8px}
+
+    .type-label{display:inline-flex;align-items:center;gap:6px;margin-right:10px}
+
+    .info{display:flex;gap:14px;flex-wrap:wrap;align-items:center;color:var(--muted)}
+
+    @media print{
+      body{background:#fff;color:#000}
+      .panel,header,.controls .btn{box-shadow:none}
+      .grid{border:1px solid #999}
+      .floor-label{background:#f2f2f2;color:#000}
+      .stack-label{background:#f2f2f2;color:#333}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <div class="brand"><span class="dot"></span>동호수 배치도</div>
+      <div class="info">인쇄: Ctrl/Cmd + P · 검색: 호수 입력</div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="panel">
+      <div class="controls">
+        <div class="field">
+          <label for="dongSel">동 선택</label>
+          <select id="dongSel"></select>
+        </div>
+        <div class="field">
+          <label for="search">호수 검색</label>
+          <input id="search" placeholder="예: 2402, 3004" />
+        </div>
+        <div class="field">
+          <label for="floorRange">표시 층 (최상층→최하층)</label>
+          <input id="floorRange" type="range" min="0" max="0" step="1" value="0" />
+        </div>
+        <div class="field">
+          <label for="allToggle">모든 동 한눈에</label>
+          <input id="allToggle" type="checkbox" />
+        </div>
+        <button id="printBtn" class="btn">인쇄 / PDF 저장</button>
+      </div>
+
+      <div class="legend">
+        <span class="pill"><span class="dot" style="background:var(--type74)"></span>74A타입</span>
+        <span class="pill"><span class="dot" style="background:var(--typeA)"></span>84A타입</span>
+        <span class="pill"><span class="dot" style="background:var(--typeB)"></span>84B타입</span>
+        <span class="pill"><span class="dot" style="background:var(--typeC)"></span>84C타입</span>
+        <span class="pill"><span class="dot" style="background:var(--typeD)"></span>84D타입</span>
+      </div>
+
+      <div id="gridArea" class="grid-wrap"></div>
+    </section>
+  </main>
+
+  <script>
+    const SITE = {
+      101: { lines: { "01": {min:2,max:20,type:"74A"}, "02": {min:2,max:20,type:"84B"}, "03": {min:2,max:20,type:"84A"} } },
+      102: { lines: { "01": {min:2,max:20,type:"84A"}, "02": {min:2,max:20,type:"84B"}, "03": {min:2,max:20,type:"84A"}, "04": {min:2,max:20,type:"84C"} } },
+      103: { lines: { "01": {min:1,max:20,type:"84A"}, "02": {min:1,max:20,type:"84A"} } },
+      104: { lines: { "01": {min:2,max:12,type:"74A"}, "02": {min:2,max:12,type:"74A"} } },
+      105: { lines: { "01": {min:1,max:20,type:"84A"}, "02": {min:1,max:20,type:"84B"}, "03": {min:2,max:19,type:"84A"}, "04": {min:2,max:18,type:"84C"} } },
+      106: { lines: { "01": {min:1,max:18,type:"84A"}, "02": {min:1,max:18,type:"84D"}, "03": {min:1,max:15,type:"84B"} } }
+    };
+
+    const BASE_URL = 'https://example.com/unit'; // ← 실제 도메인으로 수정하세요
+    const urlFor = (dong,floor,tail,hosu)=>`${BASE_URL}?dong=${dong}&line=${tail}&floor=${floor}&hosu=${hosu}`;
+    const UNIT_URLS = {};
+
+    const TYPE_COLOR = { '74A':'var(--type74)', '84A':'var(--typeA)', '84B':'var(--typeB)', '84C':'var(--typeC)', '84D':'var(--typeD)' };
+
+    const el=(s,p=document)=>p.querySelector(s);
+    const els=(s,p=document)=>[...p.querySelectorAll(s)];
+
+    const dongSel=el('#dongSel');
+    const search=el('#search');
+    const floorRange=el('#floorRange');
+    const gridArea=el('#gridArea');
+    const printBtn=el('#printBtn');
+    const allToggle=el('#allToggle');
+
+    Object.keys(SITE).sort().forEach(d=>{
+      const o=document.createElement('option');
+      o.value=d;o.textContent=d+"동";dongSel.appendChild(o);
+    });
+
+    dongSel.addEventListener('change',build);
+    search.addEventListener('input',highlightSearch);
+    floorRange.addEventListener('input',build);
+    allToggle.addEventListener('change',build);
+    printBtn.addEventListener('click',()=>window.print());
+
+    dongSel.value=Object.keys(SITE)[0];
+
+    function build(){
+      gridArea.innerHTML='';
+      if(allToggle && allToggle.checked) buildAll(); else buildSingle();
+      highlightSearch();
+    }
+
+    function getPresetRange(minF,maxF){
+      if(!floorRange.max||floorRange.max==='0'){floorRange.max=3;floorRange.value=0;}
+      const preset=Number(floorRange.value);
+      let viewMin=minF,viewMax=maxF;
+      if(preset===1) viewMin=Math.max(maxF-9,minF);
+      if(preset===2) viewMin=Math.max(maxF-4,minF);
+      if(preset===3) viewMin=Math.max(minF,Math.ceil((minF+maxF)/2));
+      return {viewMin,viewMax};
+    }
+
+    function buildSingle(){
+      const dong=dongSel.value;
+      const cfg=SITE[dong];
+      const stacks=Object.keys(cfg.lines);
+      const minF=Math.min(...stacks.map(s=>cfg.lines[s].min));
+      const maxF=Math.max(...stacks.map(s=>cfg.lines[s].max));
+      const {viewMin,viewMax}=getPresetRange(minF,maxF);
+      const block=makeDongBlock(dong,stacks,cfg,viewMin,viewMax);
+      gridArea.appendChild(block);
+    }
+
+    function buildAll(){
+      Object.keys(SITE).sort().forEach(dong=>{
+        const cfg=SITE[dong];
+        const stacks=Object.keys(cfg.lines);
+        const minF=Math.min(...stacks.map(s=>cfg.lines[s].min));
+        const maxF=Math.max(...stacks.map(s=>cfg.lines[s].max));
+        const {viewMin,viewMax}=getPresetRange(minF,maxF);
+        const block=makeDongBlock(dong,stacks,cfg,viewMin,viewMax);
+        gridArea.appendChild(block);
+      });
+    }
+
+    function makeDongBlock(dong,stacks,cfg,viewMin,viewMax){
+      const wrapper=document.createElement('div');wrapper.className='dong-block';
+      const title=document.createElement('div');title.className='dong-title';
+      const h=document.createElement('h3');h.textContent=`${dong}동`;title.appendChild(h);
+      const range=document.createElement('div');range.className='range';range.textContent=`표시 층: ${viewMax}F → ${viewMin}F / 라인: ${stacks.join(', ')}`;title.appendChild(range);
+      const types=document.createElement('div');types.className='types';
+      types.innerHTML=stacks.map(s=>{const t=cfg.lines[s].type;const color=TYPE_COLOR[t]||'#999';return `<span class=\"type-label\"><span class=\"dot\" style=\"background:${color}\"></span>${s}호라인 ${t}타입</span>`;}).join(' ');
+      title.appendChild(types);wrapper.appendChild(title);
+
+      const labels=document.createElement('div');labels.className='stack-labels';
+      labels.style.gridTemplateColumns=`120px repeat(${stacks.length}, minmax(90px, 1fr))`;
+      labels.innerHTML=`<div class=\"stack-label\" style=\"border-left:none;text-align:left">층</div>`+
+        stacks.map(s=>`<div class=\"stack-label\">${s} 라인</div>`).join('');
+      wrapper.appendChild(labels);
+
+      const grid=document.createElement('div');grid.className='grid dong-inner';wrapper.appendChild(grid);
+
+      for(let f=viewMax;f>=viewMin;f--){
+        const row=document.createElement('div');row.className='row';
+        row.style.gridTemplateColumns=`120px repeat(${stacks.length}, minmax(90px, 1fr))`;
+        const fl=document.createElement('div');fl.className='floor-label';fl.textContent=`${f}F`;row.appendChild(fl);
+        stacks.forEach(tail=>{
+          const limits=cfg.lines[tail];
+          const cell=document.createElement('div');cell.className='cell';
+          if(f>=limits.min&&f<=limits.max){
+            const hosu=`${f}${tail.padStart(2,'0')}`;
+            const key=`${dong}-${hosu}`;
+            const href = UNIT_URLS[key] || urlFor(dong, f, tail, hosu);
+            const a=document.createElement('a');
+            a.textContent=hosu+'호';
+            a.href=href; a.target='_blank'; a.rel='noopener';
+            a.style.background=TYPE_COLOR[limits.type]||'#999';
+            a.setAttribute('data-hosu',hosu);
+            a.addEventListener('click',()=>{els('.cell').forEach(c=>c.classList.remove('selected'));cell.classList.add('selected');});
+            cell.appendChild(a);
+          }
+          row.appendChild(cell);
+        });
+        grid.appendChild(row);
+      }
+      return wrapper;
+    }
+
+    function highlightSearch(){
+      const q=search.value.replace(/\D/g,'');
+      els('.cell').forEach(c=>c.classList.remove('selected'));
+      if(!q)return;
+      const target=els(`[data-hosu^=\"${q}\"]`).map(b=>b.parentElement);
+      target.forEach(c=>c.classList.add('selected'));
+      if(target[0])target[0].scrollIntoView({behavior:'smooth',block:'center',inline:'center'});
+    }
+
+    build();
+  </script>
+</body>
+</html>
